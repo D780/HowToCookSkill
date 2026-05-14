@@ -103,6 +103,77 @@ class Recommender:
 
         return "\n".join(lines)
 
+    # 常见食材推荐用量（每 2 人份基准）
+    DEFAULT_AMOUNTS = {
+        "虾": ("200g", "海虾约 8-12 只"),
+        "牛肉": ("250g", "牛腩/牛柳约一拳大小"),
+        "牛腩": ("300g", ""),
+        "猪肉": ("200g", "约掌心大小一块"),
+        "五花肉": ("250g", "约一拳大小"),
+        "鸡胸": ("200g", "约 1 块"),
+        "鸡腿": ("2 只", ""),
+        "鸡翅": ("300g", "约 6-8 个"),
+        "鱼": ("1 条", "约 400-500g"),
+        "豆腐": ("1 块", "约 300g"),
+        "鸡蛋": ("3 个", ""),
+        "西红柿": ("2 个", "约 200g"),
+        "土豆": ("2 个", "约 200g"),
+        "青椒": ("2 个", ""),
+        "蒜蓉": ("30g", "约 5-6 瓣蒜"),
+        "蒜蓉酱": ("50g", "约 3 汤匙"),
+        "葱": ("2 根", ""),
+        "姜": ("1 小块", "约 10g"),
+        "生抽": ("15ml", "约 1 汤匙"),
+        "食用油": ("适量", "约 10-15ml"),
+        "盐": ("适量", "约 3-5g"),
+    }
+
+    def _parse_ingredient(self, ing: str) -> tuple:
+        """解析食材行，分离名称、分量、备注"""
+        import re
+        # 提取 Markdown 链接文本
+        clean = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', ing)
+        clean = clean.replace("**", "").strip()
+
+        # 匹配分量模式：数字 + 单位 或 约/各/至 等
+        amount_match = re.search(r'(\d+(?:\.\d+)?\s*(?:g|ml|个|只|块|根|瓣|勺|汤匙|茶匙|杯|碗|片|段|小盒|袋|包))', clean)
+        name = clean
+        amount = ""
+        note = ""
+
+        # 括号中的备注
+        note_match = re.search(r'[（(]([^）)]*)[）)]', clean)
+        if note_match:
+            note = note_match.group(1).strip()
+            name = clean[:note_match.start()].strip()
+
+        if amount_match:
+            amount = amount_match.group(1).strip()
+            # 从名称中移除分量
+            name = name[:amount_match.start()] + name[amount_match.end():]
+            name = name.strip(" ，、-–")
+
+        return name.strip(), amount, note
+
+    def _estimate_amount(self, name: str, servings: int) -> tuple:
+        """根据食材名称和人数估算用量"""
+        import re
+        # 查找匹配
+        for keyword, (amount, hint) in self.DEFAULT_AMOUNTS.items():
+            if keyword in name:
+                # 按人数缩放
+                scale = servings / 2
+                # 数字部分缩放
+                num_match = re.search(r'(\d+(?:\.\d+)?)', amount)
+                if num_match:
+                    base = float(num_match.group(1))
+                    scaled = int(base * scale)
+                    new_amount = amount.replace(num_match.group(1), str(scaled))
+                else:
+                    new_amount = amount
+                return new_amount, hint
+        return None, None
+
     def generate_recipe_detail(self, recipe: Dict, servings: int = 2) -> str:
         lines = []
         n = recipe.get("nutrition", {})
@@ -119,8 +190,36 @@ class Recommender:
         lines.append(f"类型: {recipe.get('category_cn', '?')}")
         lines.append("")
         lines.append(f"食材（{servings} 人份）：")
+
+        has_amount = False
         for ing in recipe.get("ingredients", []):
-            lines.append(f"  - {ing}")
+            name, amount, note = self._parse_ingredient(ing)
+
+            if amount:
+                # 原始菜谱有分量
+                has_amount = True
+                display = f"  - {name}: {amount}"
+                if note:
+                    display += f" ({note})"
+                lines.append(display)
+            else:
+                # 原始菜谱没有分量，给出估算参考
+                est_amount, hint = self._estimate_amount(name, servings)
+                if est_amount:
+                    if est_amount == "适量":
+                        display = f"  - {name}: 适量"
+                    else:
+                        display = f"  - {name}: 约 {est_amount}"
+                    if hint:
+                        display += f" ({hint})"
+                    lines.append(display)
+                else:
+                    lines.append(f"  - {name} (适量)")
+
+        if not has_amount:
+            lines.append("")
+            lines.append("  * 注：原始菜谱未标注精确用量，以上为参考估算值，可根据口味自行调整")
+
         lines.append("")
         lines.append("步骤：")
         for i, step in enumerate(recipe.get("steps", []), 1):
