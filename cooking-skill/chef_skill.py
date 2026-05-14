@@ -9,6 +9,7 @@ from src.ingredient_matcher import IngredientMatcher
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INDEX_PATH = os.path.join(BASE_DIR, "data", "recipes_index.json")
+TUTORIALS_PATH = os.path.join(BASE_DIR, "data", "tutorials_index.json")
 NUTRITION_PATH = os.path.join(BASE_DIR, "data", "nutrition_db.json")
 ALIASES_PATH = os.path.join(BASE_DIR, "data", "ingredient_aliases.json")
 PREFS_PATH = os.path.join(BASE_DIR, "data", "user_preferences.json")
@@ -19,6 +20,14 @@ def load_recipes():
         print("菜谱索引不存在，请先运行索引构建: python chef_skill.py build")
         sys.exit(1)
     with open(INDEX_PATH, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def load_tutorials():
+    if not os.path.exists(TUTORIALS_PATH):
+        print("教程索引不存在，请先运行索引构建: python chef_skill.py build")
+        sys.exit(1)
+    with open(TUTORIALS_PATH, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -127,11 +136,70 @@ def cmd_build(args):
     from src.index_builder import IndexBuilder
     builder = IndexBuilder(NUTRITION_PATH, ALIASES_PATH)
     builder.build(INDEX_PATH)
+    builder.build_tutorials(TUTORIALS_PATH)
 
 
 def cmd_sync(args):
     from src.recipe_sync import run_sync
     run_sync()
+
+
+def cmd_tutorial(args):
+    tutorials = load_tutorials()
+
+    if not args.keyword:
+        print("所有烹饪教程:")
+        print("=" * 60)
+        for t in tutorials:
+            print(f"  [{t['category']}] {t['name']}")
+            if t.get('keywords'):
+                print(f"    关键词: {', '.join(t['keywords'][:5])}")
+        print(f"\n共 {len(tutorials)} 篇教程")
+        print("查看具体教程: python chef_skill.py tutorial <关键词>")
+        return
+
+    keyword = " ".join(args.keyword)
+    matches = []
+    for t in tutorials:
+        if keyword.lower() in t["name"].lower():
+            matches.append(t)
+            continue
+        for kw in t.get("keywords", []):
+            if keyword.lower() in kw.lower():
+                matches.append(t)
+                break
+
+    if not matches:
+        print(f"未找到包含 '{keyword}' 的教程")
+        print("可用教程:")
+        for t in tutorials:
+            print(f"  - {t['name']} ({t['category']})")
+        return
+
+    t = matches[0]
+    content = t.get("content", "")
+    lines = content.split("\n")
+
+    print(f"【{t['name']}】")
+    print("=" * 60)
+    print(f"分类: {t['category']}")
+    print(f"来源: {t['source_file']}")
+    print(f"关键词: {', '.join(t.get('keywords', []))}")
+    print("-" * 60)
+    print("")
+
+    in_content = False
+    for line in lines:
+        if line.startswith("#") and not in_content:
+            in_content = True
+            continue
+        print(line)
+
+    if len(matches) > 1:
+        print("\n" + "-" * 60)
+        print(f"找到 {len(matches)} 个相关教程，其他匹配:")
+        for m in matches[1:]:
+            print(f"  - {m['name']} ({m['category']})")
 
 
 def main():
@@ -180,10 +248,14 @@ def main():
     p_ingredients.add_argument("--min-match", type=float, default=0.3, help="最低匹配度")
 
     # build
-    subparsers.add_parser("build", help="构建菜谱索引")
+    subparsers.add_parser("build", help="构建索引")
 
     # sync
-    subparsers.add_parser("sync", help="同步菜谱更新")
+    subparsers.add_parser("sync", help="同步更新")
+
+    # tutorial
+    p_tutorial = subparsers.add_parser("tutorial", help="查看烹饪教程")
+    p_tutorial.add_argument("keyword", nargs="*", help="教程关键词")
 
     args = parser.parse_args()
 
@@ -199,6 +271,7 @@ def main():
         "ingredients": cmd_ingredients,
         "build": cmd_build,
         "sync": cmd_sync,
+        "tutorial": cmd_tutorial,
     }
 
     commands[args.command](args)

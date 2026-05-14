@@ -30,6 +30,23 @@ DIFFICULTY_TIME_MAP = {
 }
 
 
+TIPS_CATEGORIES = [
+    "tips/learn",
+    "tips/advanced",
+]
+
+TIPS_ROOT_FILES = [
+    "tips/厨房准备.md",
+    "tips/如何选择现在吃什么.md",
+    "tips/食材相克与禁忌.md",
+]
+
+TIPS_CATEGORY_MAP = {
+    "tips/learn": "烹饪技法",
+    "tips/advanced": "高级技巧",
+}
+
+
 class IndexBuilder:
     def __init__(self, nutrition_db_path: str, aliases_path: str):
         self.calc = NutritionCalculator(nutrition_db_path)
@@ -46,6 +63,23 @@ class IndexBuilder:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(recipes, f, ensure_ascii=False, indent=2)
         print(f"\n已构建 {len(recipes)} 道菜谱索引 -> {output_path}")
+
+    def build_tutorials(self, output_path: str):
+        tutorials = []
+        for file_path in TIPS_ROOT_FILES:
+            tutorial = self._fetch_tips_file(file_path)
+            if tutorial:
+                tutorials.append(tutorial)
+                print(f"  已获取 {file_path}")
+
+        for category in TIPS_CATEGORIES:
+            category_tutorials = self._fetch_tips_category(category)
+            tutorials.extend(category_tutorials)
+            print(f"  已获取 {category}: {len(category_tutorials)} 篇")
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(tutorials, f, ensure_ascii=False, indent=2)
+        print(f"\n已构建 {len(tutorials)} 篇教程索引 -> {output_path}")
 
     def _fetch_category(self, category: str) -> List[Dict]:
         url = f"{GITHUB_API_BASE}/dishes/{category}"
@@ -171,3 +205,55 @@ class IndexBuilder:
             if method in content:
                 return method
         return ""
+
+    def _fetch_tips_file(self, file_path: str) -> Dict:
+        url = f"{GITHUB_RAW_BASE}/{file_path}"
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            content = resp.text
+        except Exception as e:
+            print(f"获取教程 {file_path} 失败: {e}")
+            return None
+
+        return self._parse_tutorial(content, file_path)
+
+    def _fetch_tips_category(self, category: str) -> List[Dict]:
+        url = f"{GITHUB_API_BASE}/{category}"
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            items = resp.json()
+        except Exception as e:
+            print(f"获取教程分类 {category} 失败: {e}")
+            return []
+
+        tutorials = []
+        for item in items:
+            if item.get("type") != "file" or not item["name"].endswith(".md"):
+                continue
+            tutorial = self._fetch_tips_file(f"{category}/{item['name']}")
+            if tutorial:
+                tutorials.append(tutorial)
+        return tutorials
+
+    def _parse_tutorial(self, content: str, file_path: str) -> Dict:
+        name = file_path.split("/")[-1].replace(".md", "")
+        category = "基础指南"
+        for prefix, cat in TIPS_CATEGORY_MAP.items():
+            if file_path.startswith(prefix):
+                category = cat
+                break
+
+        keywords = []
+        for kw in ["焯水", "蒸", "煮", "炒", "煎", "炸", "烤", "炖", "凉拌", "腌", "高压锅", "空气炸锅", "微波炉", "去腥", "油温", "糖色", "辅料", "厨房准备", "食材相克"]:
+            if kw in content or kw in name:
+                keywords.append(kw)
+
+        return {
+            "name": name,
+            "category": category,
+            "keywords": keywords,
+            "content": content,
+            "source_file": file_path,
+        }
