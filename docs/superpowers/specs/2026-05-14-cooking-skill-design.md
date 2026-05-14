@@ -209,16 +209,19 @@
 ```
 cooking-skill/
 ├── data/
-│   ├── recipes_index.json      # 菜谱索引（自动生成）
-│   ├── nutrition_db.json        # 食材营养数据库
-│   └── user_preferences.json    # 用户口味偏好
-├── scripts/
-│   ├── build_index.py           # 构建菜谱索引
-│   ├── sync_recipes.py          # 定时同步脚本
-│   └── nutrition_calculator.py  # 营养估算工具
-├── chef_skill.py                # 技能交互入口
-├── README.md                    # 使用说明
-└── requirements.txt             # Python 依赖
+│   ├── recipes_index.json         # 菜谱索引（自动生成）
+│   ├── nutrition_db.json          # 食材营养数据库
+│   ├── ingredient_aliases.json    # 食材别名映射
+│   └── user_preferences.json      # 用户口味偏好
+├── src/
+│   ├── index_builder.py           # 菜谱索引构建器
+│   ├── recipe_sync.py             # 菜谱同步服务
+│   ├── nutrition_calculator.py    # 营养估算工具
+│   ├── ingredient_matcher.py      # 食材匹配引擎
+│   └── recommender.py             # 推荐引擎
+├── chef_skill.py                  # 技能交互入口（CLI/API）
+├── README.md                      # 使用说明
+└── requirements.txt               # Python 依赖
 ```
 
 ## 技术选型
@@ -226,7 +229,87 @@ cooking-skill/
 - **语言**：Python 3
 - **数据格式**：JSON
 - **依赖**：requests（HTTP 请求）、json（数据序列化）
-- **定时任务**：通过 Schedule 工具配置 cron 执行 `sync_recipes.py`
+- **定时任务**：通过 Schedule 工具配置 cron 执行 `recipe_sync.py`
+- **抓取方式**：GitHub REST API + 原始文件直链（`raw.githubusercontent.com`）
+
+## 数据格式规范
+
+### `ingredient_aliases.json` - 食材别名映射
+
+```json
+{
+  "西红柿": ["番茄", "西红柿"],
+  "土豆": ["马铃薯", "土豆"],
+  "卷心菜": ["包菜", "圆白菜", "卷心菜"],
+  "青椒": ["柿子椒", "青椒"]
+}
+```
+
+### `user_preferences.json` - 用户口味偏好
+
+```json
+{
+  "disliked_ingredients": ["香菜", "芹菜"],
+  "disliked_taste": ["特辣"],
+  "favorite_categories": ["素菜", "汤粥"],
+  "favorite_recipes": ["宫保鸡丁", "西红柿炒鸡蛋"],
+  "default_spiciness_max": 2,
+  "default_calories_max": 500,
+  "diet_mode": null
+}
+```
+
+### `recipes_index.json` - 菜谱索引条目
+
+```json
+{
+  "name": "西红柿炒鸡蛋",
+  "category": "vegetable_dish",
+  "difficulty": 2,
+  "spiciness": 0,
+  "nutrition": {
+    "calories": 180,
+    "protein": 9.5,
+    "carbs": 12.3,
+    "fat": 10.2
+  },
+  "ingredients": ["西红柿", "鸡蛋", "食用油", "盐"],
+  "cooking_time_min": 15,
+  "tags": ["快手", "低脂", "清淡"],
+  "source_file": "dishes/vegetable_dish/西红柿炒鸡蛋.md",
+  "last_updated": "2026-05-14"
+}
+```
+
+## 模块交互流程
+
+```
+用户请求 → chef_skill.py（解析意图）
+              ↓
+     recommender.py（推荐引擎）
+              ↓
+    ┌─────────┼──────────┐
+    ↓         ↓          ↓
+  食材匹配  营养计算   菜谱索引
+    ↓         ↓          ↓
+ ingredient_  nutrition  recipes_
+ matcher.py   calculator.py  index.json
+```
+
+## 同步机制细节
+
+### 增量更新策略
+
+- 对比本地 `recipes_index.json` 与远程目录结构
+- **新增菜谱**：下载 Markdown，解析元数据，计算营养，追加索引
+- **删除菜谱**：远程不存在但本地有的，标记为 `deprecated`，30 天后清理
+- **重命名菜谱**：通过内容 hash 检测移动/重命名，更新路径映射
+
+### GitHub API 频率控制
+
+- 使用 raw 文件直链抓取（无需 API token，无频率限制）
+- 目录结构通过 GitHub API 获取（未认证 60 次/小时）
+- 本地缓存目录结构，仅在有更新时重新拉取
 
 ## 营养数据来源
 
@@ -239,3 +322,4 @@ cooking-skill/
 - 网络请求失败：使用本地缓存的索引数据
 - 营养数据缺失：标记为"估算值"，提示用户
 - 菜谱解析失败：跳过该菜谱，记录日志
+- 食材无法匹配：使用模糊匹配（编辑距离 ≤ 2）
