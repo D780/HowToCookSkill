@@ -327,6 +327,8 @@ how-to-cook-skill/
 
 ## 📦 安装使用
 
+### 方式一：独立使用（CLI）
+
 ```bash
 # 克隆或下载技能
 cd how-to-cook-skill
@@ -341,7 +343,34 @@ python chef_skill.py build
 python chef_skill.py recommend --people 2
 ```
 
-也可以作为 SOLO Skill 安装到 AI Agent，直接用自然语言对话。
+### 方式二：作为 AI Agent 技能安装
+
+本技能遵循 [superpowers](https://github.com/obra/superpowers) 规范，可安装到 SOLO AI Agent 中使用。
+
+**安装步骤：**
+
+```bash
+# 将技能克隆到 AI Agent 的 skills 目录
+git clone <repo-url> <skills-root>/how-to-cook-skill
+
+# 进入技能目录安装依赖
+cd <skills-root>/how-to-cook-skill
+pip install -r requirements.txt
+
+# 构建菜谱和教程索引（首次使用必须执行）
+python chef_skill.py build
+```
+
+**安装完成后：**
+
+1. AI Agent 启动时会自动扫描 `skills/` 目录，读取 `SKILL.md` 识别该技能
+2. 当用户输入烹饪相关意图（如"今天吃什么"、"怎么焯水"）时，AI 会自动触发该技能
+3. AI 会主动询问用餐人数、口味偏好、家中食材等信息，返回结构化推荐结果
+
+**注意事项：**
+- `SKILL.md` 是 AI Agent 的技能描述文件，定义了触发条件和交互流程，不可删除
+- 索引文件（`data/recipes_index.json`、`data/tutorials_index.json`）必须在首次使用前构建完成，否则 AI 无法执行推荐
+- 如后续菜谱有更新，可运行 `python chef_skill.py sync` 同步最新数据
 
 ---
 
