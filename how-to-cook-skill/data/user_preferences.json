@@ -1,0 +1,10 @@
+{
+  "disliked_ingredients": [],
+  "disliked_taste": [],
+  "favorite_categories": [],
+  "favorite_recipes": [],
+  "default_spiciness_max": 5,
+  "default_calories_max": 1000,
+  "diet_mode": null,
+  "disliked_recipes": []
+}
