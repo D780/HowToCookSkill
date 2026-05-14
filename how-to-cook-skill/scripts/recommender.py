@@ -228,7 +228,46 @@ class Recommender:
         lines.append("=" * 40)
         return "\n".join(lines)
 
+    # 购物清单食材分类关键词
+    SHOPPING_CATEGORIES = {
+        "海鲜水产": ["虾", "鱼", "鳊鱼", "鲮鱼", "蟹", "贝", "螺", "鱿", "鲍", "参"],
+        "肉禽蛋": ["肉", "牛", "猪", "羊", "鸡", "鸭", "腊肠", "培根", "蛋", "翅", "腿", "排骨", "鹅"],
+        "蔬菜菌菇": ["荷兰豆", "油麦菜", "大蒜", "蒜", "葱", "姜", "椒", "菜", "菇", "笋", "萝卜", "瓜", "薯", "芹", "蒿", "菠菜", "西兰花", "豆", "韭"],
+        "豆制品": ["豆腐", "豆干", "豆皮", "腐竹"],
+        "调料": ["生抽", "老抽", "料酒", "蚝油", "醋", "盐", "糖", "八角", "桂皮", "香叶", "胡椒", "豆瓣酱"],
+        "辅料调味": ["蒜蓉酱", "芝士", "黄油", "橄榄油"],
+        "主食其他": [],
+    }
+
+    # 购物清单中排除的物品（厨具、工具等）
+    SHOPPING_EXCLUDE = ["锅", "手套", "纸", "匙", "烤箱", "碗", "盘", "刀", "铲", "水", "烤箱", "隔热", "夹", "容器", "玻璃", "锡箔"]
+
+    def _classify_ingredient(self, name: str) -> str:
+        """将食材分类"""
+        # 特殊匹配
+        special = {
+            "蒜蓉酱": "辅料调味",
+            "芝士": "辅料调味",
+            "培根": "肉禽蛋",
+            "黄油": "辅料调味",
+            "橄榄油": "辅料调味",
+            "食用油": "调料",
+        }
+        if name in special:
+            return special[name]
+
+        for cat, keywords in self.SHOPPING_CATEGORIES.items():
+            if cat == "主食其他":
+                continue
+            if any(kw in name for kw in keywords):
+                # 排除非食材项
+                if any(skip in name for skip in self.SHOPPING_EXCLUDE):
+                    continue
+                return cat
+        return "主食其他"
+
     def generate_shopping_list(self, recipes: List[Dict], have: List[str] = None) -> str:
+        import re
         from scripts.ingredient_matcher import IngredientMatcher
         try:
             matcher = IngredientMatcher("data/ingredient_aliases.json")
@@ -240,17 +279,43 @@ class Recommender:
                     if ing not in needed:
                         needed.append(ing)
 
+        # 清理和分类食材
+        categories = {}
+        for item in needed:
+            clean = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', item)
+            clean = re.sub(r'[（(][^）)]*[）)]', '', clean).strip()
+            clean = clean.strip(' ，、-–**')
+
+            if not clean or len(clean) <= 1:
+                continue
+            if any(skip in clean for skip in self.SHOPPING_EXCLUDE):
+                continue
+
+            cat = self._classify_ingredient(clean)
+            if cat not in categories:
+                categories[cat] = []
+            if clean not in categories[cat]:
+                categories[cat].append(clean)
+
+        # 按固定顺序输出
+        cat_order = ["海鲜水产", "肉禽蛋", "蔬菜菌菇", "豆制品", "辅料调味", "调料", "主食其他"]
+
         recipe_names = " + ".join(r["name"] for r in recipes)
         lines = [
-            f"购物清单（{recipe_names}）",
-            "=" * 40,
+            f"🛒 购物清单（{recipe_names}）",
+            "━" * 40,
         ]
-        if needed:
-            lines.append("需要购置：")
-            for item in needed:
-                lines.append(f"  - {item}")
-        else:
+
+        if not categories:
             lines.append("食材齐全，无需购买！")
+        else:
+            for cat in cat_order:
+                items = categories.get(cat, [])
+                if items:
+                    lines.append(f"  {cat}")
+                    lines.append(f"    {'、'.join(items)}")
+                    lines.append("")
+
         return "\n".join(lines)
 
     def _get_season(self) -> str:
