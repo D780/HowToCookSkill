@@ -13,17 +13,17 @@ description: Use when user asks what to eat, needs recipe recommendations, wants
 
 ## 前置条件
 
-确保 `cooking-skill` 项目已就绪，索引文件存在：
+确保技能目录已就绪，索引文件存在：
 
 ```bash
-ls cooking-skill/data/recipes_index.json
-ls cooking-skill/data/tutorials_index.json
+ls data/recipes_index.json
+ls data/tutorials_index.json
 ```
 
 如不存在，先构建索引：
 
 ```bash
-cd cooking-skill && python chef_skill.py build
+python chef_skill.py build
 ```
 
 ## 何时使用
@@ -84,7 +84,7 @@ digraph cooking_flow {
 
 ## 命令执行
 
-通过 `chef_skill.py` 执行操作，在 `cooking-skill/` 目录下运行：
+通过 `chef_skill.py` 执行操作，在技能目录下运行：
 
 ### 推荐菜式
 

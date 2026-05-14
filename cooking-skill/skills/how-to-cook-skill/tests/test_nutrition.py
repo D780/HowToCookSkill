@@ -2,7 +2,7 @@ import json
 import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from src.nutrition_calculator import NutritionCalculator
+from scripts.nutrition_calculator import NutritionCalculator
 
 
 def test_calculate_nutrition():

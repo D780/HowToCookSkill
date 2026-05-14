@@ -3,7 +3,7 @@ import re
 import sys
 import requests
 from typing import Dict, List
-from src.nutrition_calculator import NutritionCalculator
+from scripts.nutrition_calculator import NutritionCalculator
 
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Anduin2017/HowToCook/master"
 GITHUB_API_BASE = "https://api.github.com/repos/Anduin2017/HowToCook/contents"

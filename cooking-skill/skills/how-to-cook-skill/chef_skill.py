@@ -4,8 +4,8 @@ import json
 import os
 import sys
 import argparse
-from src.recommender import Recommender
-from src.ingredient_matcher import IngredientMatcher
+from scripts.recommender import Recommender
+from scripts.ingredient_matcher import IngredientMatcher
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INDEX_PATH = os.path.join(BASE_DIR, "data", "recipes_index.json")
@@ -133,14 +133,14 @@ def cmd_ingredients(args):
 
 
 def cmd_build(args):
-    from src.index_builder import IndexBuilder
+    from scripts.index_builder import IndexBuilder
     builder = IndexBuilder(NUTRITION_PATH, ALIASES_PATH)
     builder.build(INDEX_PATH)
     builder.build_tutorials(TUTORIALS_PATH)
 
 
 def cmd_sync(args):
-    from src.recipe_sync import run_sync
+    from scripts.recipe_sync import run_sync
     run_sync()
 
 

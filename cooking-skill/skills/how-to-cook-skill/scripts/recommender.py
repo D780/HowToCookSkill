@@ -30,7 +30,7 @@ class Recommender:
         candidates = list(self.recipes)
 
         if have_ingredients:
-            from src.ingredient_matcher import IngredientMatcher
+            from scripts.ingredient_matcher import IngredientMatcher
             try:
                 matcher = IngredientMatcher("data/ingredient_aliases.json")
                 candidates = matcher.find_by_ingredients(have_ingredients, candidates, min_match=0.3)
@@ -130,7 +130,7 @@ class Recommender:
         return "\n".join(lines)
 
     def generate_shopping_list(self, recipes: List[Dict], have: List[str] = None) -> str:
-        from src.ingredient_matcher import IngredientMatcher
+        from scripts.ingredient_matcher import IngredientMatcher
         try:
             matcher = IngredientMatcher("data/ingredient_aliases.json")
             needed = matcher.get_shopping_list(recipes, have)
@@ -226,7 +226,7 @@ class Recommender:
         return bool(main & used_ingredients)
 
     def _filter_disliked(self, candidates: List[Dict], disliked: List[str]) -> List[Dict]:
-        from src.ingredient_matcher import IngredientMatcher
+        from scripts.ingredient_matcher import IngredientMatcher
         try:
             matcher = IngredientMatcher("data/ingredient_aliases.json")
             disliked_resolved = set(matcher.resolve_name(i) for i in disliked)

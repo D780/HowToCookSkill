@@ -2,8 +2,8 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, List
-from src.index_builder import IndexBuilder
-from src.nutrition_calculator import NutritionCalculator
+from scripts.index_builder import IndexBuilder
+from scripts.nutrition_calculator import NutritionCalculator
 
 
 class RecipeSync:
